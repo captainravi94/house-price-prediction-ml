@@ -4,8 +4,6 @@ import joblib
 import numpy as np
 import plotly.express as px
 from datetime import datetime
-import requests
-from streamlit_lottie import st_lottie
 
 # ------------------------------------------------
 # CONFIG
@@ -42,29 +40,25 @@ except:
     feature_defaults = {}
 
 # ------------------------------------------------
-# LOTTIE
-# ------------------------------------------------
-def load_lottieurl(url):
-    r = requests.get(url)
-    return r.json() if r.status_code == 200 else None
-
-lottie = load_lottieurl("https://assets9.lottiefiles.com/packages/lf20_jcikwtux.json")
-
-# ------------------------------------------------
 # HEADER
 # ------------------------------------------------
-col1, col2 = st.columns([3,1])
-with col1:
-    st.title("🏢 EstateAI - Smart Property Valuation")
-with col2:
-    st_lottie(lottie, height=120)
-
+st.title("🏢 EstateAI - Smart Property Valuation")
+st.markdown("AI-Powered Real Estate Price Prediction System")
 st.markdown("---")
 
 # ------------------------------------------------
 # NAVIGATION
 # ------------------------------------------------
-page = st.sidebar.radio("Navigation", ["Single Prediction", "Batch Prediction", "Admin Dashboard"])
+page = st.sidebar.radio("Navigation", 
+                        ["Single Prediction", 
+                         "Batch Prediction", 
+                         "Admin Dashboard"])
+
+# ------------------------------------------------
+# CURRENCY SELECTOR
+# ------------------------------------------------
+currency = st.sidebar.selectbox("Currency", ["USD ($)", "INR (₹)"])
+usd_to_inr = 83  # Approx conversion rate
 
 # ------------------------------------------------
 # SINGLE PREDICTION
@@ -102,7 +96,15 @@ if page == "Single Prediction":
 
     if st.button("Predict Price"):
         pred = model.predict(input_df)[0]
-        st.metric("Estimated Property Value", f"₹ {int(pred):,}")
+
+        # Currency conversion
+        if currency == "INR (₹)":
+            pred = pred * usd_to_inr
+            symbol = "₹"
+        else:
+            symbol = "$"
+
+        st.metric("Estimated Property Value", f"{symbol} {int(pred):,}")
 
 # ------------------------------------------------
 # BATCH PREDICTION
@@ -115,14 +117,20 @@ elif page == "Batch Prediction":
 
     if file:
         df = pd.read_csv(file)
-
         preds = model.predict(df)
+
+        if currency == "INR (₹)":
+            preds = preds * usd_to_inr
+
         df["PredictedPrice"] = preds
 
         st.dataframe(df.head())
 
         csv = df.to_csv(index=False).encode("utf-8")
-        st.download_button("Download Predictions", csv, "batch_predictions.csv", "text/csv")
+        st.download_button("Download Predictions", 
+                           csv, 
+                           "batch_predictions.csv", 
+                           "text/csv")
 
 # ------------------------------------------------
 # ADMIN DASHBOARD
@@ -131,7 +139,7 @@ elif page == "Admin Dashboard":
 
     st.subheader("Admin Analytics Dashboard")
 
-    # Fake analytics example
+    # Sample analytics visualization
     sample_data = pd.DataFrame({
         "Month": ["Jan", "Feb", "Mar", "Apr", "May"],
         "AvgPrice": [200000, 210000, 190000, 230000, 250000]
@@ -145,10 +153,16 @@ elif page == "Admin Dashboard":
     try:
         names = model.named_steps["preprocess"].get_feature_names_out()
         importances = model.named_steps["regressor"].feature_importances_
-        df_imp = pd.DataFrame({"Feature": names, "Importance": importances})
-        df_imp = df_imp.sort_values("Importance", ascending=False).head(10)
 
-        fig2 = px.bar(df_imp, x="Importance", y="Feature", orientation="h")
+        df_imp = pd.DataFrame({
+            "Feature": names,
+            "Importance": importances
+        }).sort_values("Importance", ascending=False).head(10)
+
+        fig2 = px.bar(df_imp, 
+                      x="Importance", 
+                      y="Feature", 
+                      orientation="h")
         st.plotly_chart(fig2, use_container_width=True)
 
     except:
